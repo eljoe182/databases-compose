@@ -1,0 +1,10 @@
+.env
+*.bak
+
+# Folders
+redis
+redis_insight
+mysql
+mongodb
+elasticsearch
+kibana
