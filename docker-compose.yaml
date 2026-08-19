@@ -69,6 +69,50 @@ services:
     networks:
       - databases
 
+  # Single-node replica set for local transactions / change streams.
+  # Uses port 27018 on both host and container so rs0 advertises a reachable address.
+  # Auth + replica set requires a keyFile; copy to /tmp so permissions can be 400 (bind mounts on macOS often cannot).
+  mongodb-rs:
+    image: mongo:7
+    container_name: mongodb-rs
+    restart: unless-stopped
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        mkdir -p /pki
+        if [ ! -s /pki/keyfile ]; then
+          openssl rand -base64 756 > /pki/keyfile
+        fi
+        cp /pki/keyfile /tmp/mongo-keyfile
+        chmod 400 /tmp/mongo-keyfile
+        chown mongodb:mongodb /tmp/mongo-keyfile
+        exec docker-entrypoint.sh "$@"
+      - --
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27018", "--keyFile", "/tmp/mongo-keyfile"]
+    ports:
+      - 27018:27018
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-test}
+    volumes:
+      - ./mongodb-rs/data:/data/db
+      - ./mongodb-rs/pki:/pki
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --port 27018 -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --quiet --eval 'try { rs.status().ok } catch (e) { rs.initiate({ _id: \"rs0\", members: [{ _id: 0, host: \"localhost:27018\" }] }).ok }'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks:
+      - databases
+
   redis:
     image: redis:7.2
     container_name: redis-cache

@@ -9,7 +9,8 @@ The repository root `docker-compose.yaml` defines:
 - **SQL Server 2017** (`sqlserver2017`) — host port **2866** → container `1433`
 - **SQL Server 2022** (`sqlserver2022`) — host port **2433** → container `1433`
 - **MySQL 8** (`mysql-db`) — host port **6612** → container `3306`
-- **MongoDB 7** (`mongodb`) — host port **27017**
+- **MongoDB 7** (`mongodb`) — host port **27017** (standalone)
+- **MongoDB 7 replica set** (`mongodb-rs`) — host port **27018**, replica set name `rs0` (single node)
 - **Redis 7.2** (`redis-cache`) — host port **6379**
 - **RedisInsight** (`redis_insight`) — host port **5540**
 - **Elasticsearch 8.12** (`elasticsearch`) — host port **3200** → container `9200` (HTTP), and **9300**
@@ -65,10 +66,16 @@ Variables used by `docker-compose.yaml` (see `env.sample`):
   - `ELASTICSEARCH_USER` (typically `elastic`, used by your scripts/tools)
   - `ELASTICSEARCH_PASSWORD` (password for the `elastic` user)
   - `ELASTICSEARCH_KIBANA_TOKEN` (service account token used by Kibana)
-- **MongoDB**
+- **MongoDB** (standalone and replica set)
   - `MONGO_ROOT_PASSWORD`
   - Optional: `MONGO_ROOT_USERNAME` (default `root`)
   - Optional: `MONGO_DATABASE` (default `test`)
+
+Replica set connection from the host (after the container is healthy):
+
+```
+mongodb://root:<MONGO_ROOT_PASSWORD>@localhost:27018/?replicaSet=rs0&authSource=admin
+```
 
 ## Service URLs (from your host)
 
@@ -81,7 +88,9 @@ Variables used by `docker-compose.yaml` (see `env.sample`):
 
 Compose mounts local directories so data survives restarts:
 
-- `./mongodb/data` → MongoDB data directory
+- `./mongodb/data` → MongoDB standalone data directory
+- `./mongodb-rs/data` → MongoDB replica set data directory
+- `./mongodb-rs/pki` → MongoDB replica set `keyFile` (generated on first start; required when auth is enabled)
 - `./redis` → Redis data directory (includes `dump.rdb`)
 - `./redis_insight` → RedisInsight data
 - `./elasticsearch` → Elasticsearch data directory
